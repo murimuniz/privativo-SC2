@@ -228,7 +228,7 @@ const SYNC_TXT={
   online:["ok","● Sincronizado: todos os aparelhos veem os mesmos números"],
   offline:["off","Sem conexão: os registros ficam neste aparelho e sobem sozinhos quando a internet voltar"]
 };
-const syncLine=()=>{const t=SYNC_TXT[sync.mode];return `<div class="syncline ${t[0]}">${t[1]}</div>`};
+const syncLine=()=>{if(sync.mode==="local")return "";const t=SYNC_TXT[sync.mode];return `<div class="syncline ${t[0]}">${t[1]}</div>`};
 // registro: {u:código único, k:"aaaa-mm-dd", t:timestamp, s:setor, z:tamanho, i:id, f:função, c:[cores], d:1 se fictício}
 
 /* ---------- datas ---------- */
