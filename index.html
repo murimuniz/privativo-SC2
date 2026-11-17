@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#3F51B5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Privativos (Protótipo)</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+  :root{--bar:#3F51B5;--bg:#EAF0FB;--text:#2F45B5;--div:#B4BCCB;--sel:#C3D2F6;--dis:#9AA3B8;--ok:#2E7D32;--olive:#8C7B14}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{background:#d9dde6;font-family:Roboto,Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px}
+  .desknote{max-width:380px;font-size:12px;color:#444;margin:0 0 10px;text-align:center;line-height:1.4}
+  .phone{width:360px;height:720px;background:#111;border-radius:22px;padding:10px;box-shadow:0 6px 24px rgba(0,0,0,.35)}
+  .screen{position:relative;width:100%;height:100%;background:var(--bg);border-radius:6px;overflow:hidden;display:flex;flex-direction:column}
+  /* no celular: ocupa a tela toda, sem moldura */
+  @media (max-width:600px){
+    body{display:block;padding:0;background:var(--bg)}
+    .desknote{display:none}
+    .phone{width:100%;height:var(--vh,100dvh);padding:0;border-radius:0;background:none;box-shadow:none}
+    .screen{border-radius:0}
+  }
+  .bar{background:var(--bar);color:#fff;min-height:52px;padding-top:env(safe-area-inset-top);display:flex;align-items:center;font-size:17px;font-weight:500;flex:none}
+  .bar .back,.bar .menu{width:48px;text-align:center;cursor:pointer;user-select:none;height:52px;line-height:52px}
+  .bar .back{font-size:24px}.bar .menu{font-size:26px}
+  .bar .ttl{flex:1;padding-left:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bar .back + .ttl{padding-left:0}
+  .body{flex:1;overflow-y:auto;min-height:0}
+  .label{color:var(--bar);font-size:12px;font-weight:700;text-align:center;padding:5px 0 3px;border-bottom:1px solid var(--div);border-top:1px solid var(--div);flex:none}
+  .label small{font-weight:400;color:var(--dis)}
+
+  /* início */
+  .mrow{border-bottom:1px solid var(--div);cursor:pointer;display:flex;flex-direction:column;align-items:center;padding:16px 0 12px;min-height:110px;color:var(--text);font-size:18px;text-align:center}
+  .mrow:active{background:var(--sel)}
+  .mrow svg{margin-bottom:6px}
+  .mrow.b{font-weight:700}
+  .warn{background:#FFF3CD;color:#6b5400;font-size:12px;text-align:center;padding:8px 10px}
+  .menupanel{position:absolute;top:56px;right:6px;background:#fff;border:1px solid var(--div);box-shadow:0 4px 14px rgba(0,0,0,.3);z-index:5;min-width:250px}
+  .menupanel div{padding:14px;font-size:14px;color:#222;cursor:pointer;border-bottom:1px solid #eee}
+  .menupanel div.off{color:#aaa;cursor:default}
+  .shade{position:absolute;inset:0;z-index:4}
+
+  /* entrega */
+  .ent{display:flex;flex-direction:column;height:100%;overflow-y:auto}
+  .sec{display:flex;flex-direction:column;min-height:0}
+  .s1{flex:1 0 140px}.s4{flex:1 0 108px}.s5{flex:1 0 140px}
+  .pad{padding:7px 10px;flex:1;display:flex;min-height:0}
+  .grid{display:grid;gap:7px;width:100%;grid-auto-rows:1fr}
+  .g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}.g5{grid-template-columns:repeat(5,1fr)}
+  .opt{display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid var(--div);color:var(--text);font-weight:700;font-size:14px;cursor:pointer;user-select:none;text-align:center;min-height:36px}
+  .opt.sel{background:var(--bar);border-color:var(--bar);color:#fff}
+  .span2{grid-column:span 2}
+  .two{display:flex;flex:none}
+  .two>div{flex:1;min-width:0}
+  .two>div:first-child{border-right:1px solid var(--div)}
+  .two .pad{flex:none}
+  input.id{width:100%;height:46px;border:1px solid var(--div);background:#fff;font-size:19px;text-align:center;color:var(--text);font-weight:700;letter-spacing:1px;outline:none;min-width:0;border-radius:0}
+  input.id:focus{border-color:var(--bar);box-shadow:0 0 0 2px var(--sel)}
+  input.id::placeholder{font-weight:400;letter-spacing:0;font-size:12px;color:var(--dis)}
+  .fn{height:46px;width:100%;display:flex;align-items:center;justify-content:space-between;padding:0 10px;background:#fff;border:1px solid var(--div);color:var(--text);font-weight:700;font-size:13px;cursor:pointer;user-select:none;gap:4px}
+  .fn.ph{font-weight:400;color:var(--dis)}
+  .fn span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cor{display:flex;align-items:center;justify-content:center;border:3px solid transparent;cursor:pointer;user-select:none;font-size:12px;font-weight:700;position:relative;min-height:54px}
+  .cor .chk{position:absolute;top:1px;right:5px;font-size:16px}
+  .cor.sel{border-color:#111;box-shadow:inset 0 0 0 2px #fff}
+  .foot{position:sticky;bottom:0;margin-top:auto;border-top:1px solid var(--div);background:var(--bg);padding-bottom:calc(8px + env(safe-area-inset-bottom));flex:none}
+  .info{font-size:12px;color:var(--text);text-align:center;padding:6px 8px;min-height:32px;display:flex;align-items:center;justify-content:center}
+  .ok{background:var(--ok);color:#fff;font-weight:700;font-size:14px;white-space:pre-line;line-height:1.2}
+  .btn{margin:0 10px;height:54px;background:var(--dis);color:#fff;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:not-allowed;user-select:none}
+  .btn.on{background:var(--bar);cursor:pointer}
+  .sheet-bg{position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;z-index:6}
+  .sheet{width:100%;background:var(--bg);padding-bottom:env(safe-area-inset-bottom)}
+  .sheet .t{background:var(--bar);color:#fff;padding:12px;font-weight:700;font-size:14px;text-align:center}
+  .sheet .it{height:54px;display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--div);color:var(--text);font-size:17px;cursor:pointer}
+  .sheet .it.sel{background:var(--sel);font-weight:700}
+  .modal-bg{position:absolute;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:8;padding:20px}
+  .modal{background:#fff;width:100%;max-width:320px;padding:18px 18px 8px}
+  .modal h3{margin:0 0 8px;font-size:17px;color:#222}
+  .modal p{margin:0 0 12px;font-size:14px;color:#444;line-height:1.4}
+  .modal .acts{display:flex;justify-content:flex-end;gap:6px}
+  .modal .acts div{padding:10px 12px;color:var(--bar);font-weight:700;font-size:14px;cursor:pointer}
+
+  /* relatórios */
+  .datebar{display:flex;align-items:center;height:56px;border-bottom:1px solid var(--div);flex:none}
+  .datebar .arr{width:56px;text-align:center;font-size:20px;color:var(--bar);cursor:pointer;user-select:none;height:56px;line-height:56px}
+  .datebar .arr.off{color:var(--div);cursor:default}
+  .datebar .mid{flex:1;text-align:center;position:relative;height:56px;display:flex;flex-direction:column;justify-content:center}
+  .datebar .d{font-size:21px;font-weight:700;color:var(--text)}
+  .datebar .s{font-size:10px;color:var(--dis)}
+  .datebar input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+  .sum{display:flex;padding:10px 0 4px}
+  .sum div{flex:1;text-align:center}
+  .sum b{display:block;font-size:28px;color:var(--bar)}
+  .sum span{font-size:10px;color:var(--text)}
+  .demo{font-size:11px;font-weight:700;color:var(--olive);text-align:center;padding-bottom:6px}
+  .empty{padding:60px 24px;text-align:center;font-size:17px;color:var(--text)}
+  .tbl{display:flex;width:100%}
+  .cl{width:96px;flex:none}.cr{width:52px;flex:none;border-left:1px solid var(--div)}
+  .cs{flex:1;overflow-x:auto;min-width:0}.cs .inner{width:max-content}
+  .cell{height:42px;display:flex;align-items:center;justify-content:center;white-space:nowrap;color:var(--text);font-size:14px}
+  .cell.w{width:46px}
+  .l .cell{justify-content:flex-start;padding-left:6px;font-size:12px;font-weight:500}
+  .r .cell{font-weight:700;font-size:15px}
+  .hd{background:var(--bar);color:#fff!important;font-weight:700;font-size:13px!important}
+  .even{background:#fff}.odd{background:var(--bg)}.tot{background:var(--sel);font-weight:700}
+  .hint{font-size:11px;color:var(--dis);text-align:center;padding:6px 0 2px}
+  .filter{display:flex;gap:6px;padding:8px 10px;overflow-x:auto}
+  .chip{padding:7px 10px;border:1px solid var(--div);background:#fff;color:var(--text);font-size:12px;cursor:pointer;user-select:none;white-space:nowrap;flex:none}
+  .chip.on{background:var(--bar);color:#fff;border-color:var(--bar)}
+  .item{display:flex;align-items:center;padding:9px 10px;border-bottom:1px solid var(--div);color:var(--text)}
+  .item .h{width:44px;color:var(--dis);font-size:12px;flex:none}
+  .item .id{width:112px;font-weight:700;font-size:15px;white-space:nowrap;flex:none}
+  .item .sc{flex:1;font-size:13px;white-space:nowrap;min-width:0}
+  .item .sz{width:46px;text-align:center;background:var(--bar);color:#fff;font-weight:700;padding:4px 0;font-size:12px;flex:none}
+  table{border-collapse:collapse;width:100%;table-layout:fixed}
+  th,td{text-align:center;height:40px;padding:0;font-size:14px;color:var(--text)}
+  th{background:var(--bar);color:#fff;font-size:11px}
+  td:first-child,th:first-child{width:92px;text-align:left;padding-left:6px;font-size:12px}
+  tr:nth-child(even) td{background:#fff}
+  tr.tt td{background:var(--sel);font-weight:700}
+  td.b{font-weight:700}
+  .dot{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:middle;margin-right:2px;border:1px solid rgba(0,0,0,.25)}
+  .combo{padding:8px 10px;border-bottom:1px solid var(--div)}
+  .combo .n{font-size:13px;font-weight:700;color:var(--text);margin-bottom:5px}
+  .pills{display:flex;flex-wrap:wrap;gap:6px}
+  .pill{display:flex;align-items:center;gap:4px;background:#fff;border:1px solid var(--div);padding:3px 8px;font-size:12px;color:var(--text)}
+  .pill b{margin-left:3px}
+</style>
+</head>
+<body>
+<p class="desknote"><b>Protótipo de entrega de privativos.</b> Os registros ficam salvos neste navegador. No celular, abra este arquivo e a tela ocupa o aparelho todo.</p>
+<div class="phone"><div class="screen" id="scr"></div></div>
+
+<script>
+const SECTORS=["UTI","C.C.","CME","SND","ENG. CLÍNICA"];
+const SIZES=["PP","P","M","G","GG","EXG","EXG2","EXG3","EXG4"];
+const FUNCS=["Enfermeiro","Técnico de enfermagem","Médico","Fisio / Instrumentador","Apoio"];
+const SHORT={"Enfermeiro":"Enfermeiro","Técnico de enfermagem":"Téc. enferm.","Médico":"Médico","Fisio / Instrumentador":"Fisio/Instrum.","Apoio":"Apoio"};
+const COLORS=[
+  {n:"Azul",bg:"#3F72B8",fg:"#fff"},{n:"Cinza",bg:"#9AA0A6",fg:"#111"},
+  {n:"Verde",bg:"#3E8E5A",fg:"#fff"},{n:"Bege",bg:"#DCC9A6",fg:"#111"}];
+const CN=COLORS.map(c=>c.n);
+const COLOR_OF=n=>COLORS.find(c=>c.n===n);
+const DEFAULT_COLOR={"Enfermeiro":"Azul","Técnico de enfermagem":"Cinza","Médico":"Verde","Apoio":"Bege"};
+
+/* ---------- armazenamento local (fica no aparelho, funciona offline) ---------- */
+const KEY="privativos.v1";
+let storageOk=true, mem=[];
+function loadAll(){
+  try{const raw=localStorage.getItem(KEY);return raw?JSON.parse(raw):[]}
+  catch(e){storageOk=false;return mem}
+}
+function saveAll(){
+  mem=data;
+  try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){storageOk=false}
+}
+let data=loadAll();
+// registro: {k:"aaaa-mm-dd", t:timestamp, s:setor, z:tamanho, i:id, f:função, c:[cores], d:1 se fictício}
+
+/* ---------- datas ---------- */
+const pad=n=>String(n).padStart(2,"0");
+const keyOf=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const todayKey=()=>keyOf(new Date());
+const addDays=(k,n)=>{const[y,m,d]=k.split("-").map(Number);const x=new Date(y,m-1,d+n);return keyOf(x)};
+const labelOf=k=>{const[y,m,d]=k.split("-");return d+"/"+m+"/"+y};
+
+/* ---------- dados fictícios ---------- */
+function rng(seed){return()=>{seed=(seed*1664525+1013904223)%4294967296;return seed/4294967296}}
+function wpick(r,items,w){let t=w.reduce((a,b)=>a+b),x=r()*t;for(let i=0;i<items.length;i++){x-=w[i];if(x<0)return items[i]}return items[0]}
+function makeDemo(){
+  const out=[], r=rng(42);
+  for(let back=0;back<7;back++){
+    if(back===5)continue; // um dia sem registros, para mostrar a mensagem de "nenhum registro"
+    const k=addDays(todayKey(),-back), [y,m,d]=k.split("-").map(Number);
+    const n=28+Math.floor(r()*16);
+    for(let i=0;i<n;i++){
+      const fn=wpick(r,FUNCS,[26,34,12,8,16]);
+      const def=DEFAULT_COLOR[fn]||wpick(r,CN,[1,1,1,1]);
+      let colors=[def];
+      if(r()<0.22){const other=CN.filter(c=>c!==def);colors.push(other[Math.floor(r()*3)])}
+      colors=CN.filter(c=>colors.includes(c));
+      const t=new Date(y,m-1,d,6+Math.floor(r()*12),Math.floor(r()*60)).getTime();
+      out.push({k,t,s:SECTORS[Math.floor(r()*5)],z:wpick(r,SIZES,[2,8,18,22,20,14,8,5,3]),
+        i:String(10000+Math.floor(r()*900)),f:fn,c:colors,d:1});
+    }
+  }
+  return out;
+}
+
+/* ---------- estado da interface ---------- */
+let screen="home", day=todayKey(), filter=null, menuOpen=false, timer=null, last=0;
+let st={sector:null,id:"",fn:null,cores:[],size:null,sheet:false,msg:null};
+const $=id=>document.getElementById(id);
+const order=cs=>CN.filter(n=>cs.includes(n));
+const ready=()=>st.sector&&st.id.trim()&&st.fn&&st.cores.length&&st.size;
+const dot=n=>`<span class="dot" style="background:${COLOR_OF(n).bg}"></span>`;
+const recs=k=>data.filter(e=>e.k===k).sort((a,b)=>a.t-b.t);
+const pieces=a=>a.reduce((s,e)=>s+e.c.length,0);
+const hhmm=t=>{const d=new Date(t);return pad(d.getHours())+":"+pad(d.getMinutes())};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function bar(title,back,menu){
+  return `<div class="bar">${back?'<span class="back" id="back">←</span>':""}<span class="ttl">${title}</span>${menu?'<span class="menu" id="mn">⋮</span>':""}</div>`;
+}
+function go(s){screen=s;menuOpen=false;filter=null;render()}
+function wireBack(){const b=$("back");if(b)b.onclick=()=>{if(history.state&&history.state.s&&history.state.s!=="home")history.back();else go("home")}}
+
+function modal(title,text,okLabel,onOk,cancelLabel){
+  const m=document.createElement("div");m.className="modal-bg";
+  m.innerHTML=`<div class="modal"><h3>${title}</h3><p>${text}</p><div class="acts">${cancelLabel?`<div id="mc">${cancelLabel}</div>`:""}<div id="mo">${okLabel}</div></div></div>`;
+  $("scr").appendChild(m);
+  const close=()=>m.remove();
+  m.querySelector("#mo").onclick=()=>{close();onOk&&onOk()};
+  if(cancelLabel)m.querySelector("#mc").onclick=close;
+}
+
+/* ---------- ícones ---------- */
+const ICON={
+  shirt:'<svg width="40" height="40" viewBox="0 0 24 24"><polygon points="8,3 10,3 12,6 14,3 16,3 21,6 19,10 17,9 17,21 7,21 7,9 5,10 3,6" fill="#F3CB3B" stroke="#8C7B14" stroke-width="1.2"/></svg>',
+  bars:'<svg width="40" height="40" viewBox="0 0 24 24"><rect x="3" y="13" width="5" height="8" fill="#F3CB3B" stroke="#8C7B14" stroke-width="1.2"/><rect x="9.5" y="7" width="5" height="14" fill="#F3CB3B" stroke="#8C7B14" stroke-width="1.2"/><rect x="16" y="3" width="5" height="18" fill="#F3CB3B" stroke="#8C7B14" stroke-width="1.2"/></svg>',
+  pal:'<svg width="40" height="40" viewBox="0 0 24 24"><circle cx="6.5" cy="12" r="4.2" fill="#3F72B8" stroke="#555" stroke-width=".8"/><circle cx="12" cy="7" r="4.2" fill="#9AA0A6" stroke="#555" stroke-width=".8"/><circle cx="17.5" cy="12" r="4.2" fill="#3E8E5A" stroke="#555" stroke-width=".8"/><circle cx="12" cy="17" r="4.2" fill="#DCC9A6" stroke="#555" stroke-width=".8"/></svg>'
+};
+
+/* ---------- INÍCIO ---------- */
+function rHome(){
+  const demoN=data.filter(e=>e.d).length;
+  $("scr").innerHTML=bar("PROTÓTIPO",false,true)+`
+  ${storageOk?"":'<div class="warn">Este navegador não permite salvar dados. Os registros somem ao fechar a página.</div>'}
+  <div class="body">
+    <div class="mrow b" data-g="entrega">${ICON.shirt}ENTREGA DE PRIVATIVOS</div>
+    <div class="mrow" data-g="rel">${ICON.bars}RELATÓRIOS</div>
+    <div class="mrow" data-g="cores">${ICON.pal}RELATÓRIO DE CORES</div>
+  </div>
+  ${menuOpen?`<div class="shade" id="shade"></div><div class="menupanel"><div id="m1">Carregar dados de demonstração</div><div id="m2" class="${demoN?"":"off"}">Remover dados de demonstração (${demoN})</div><div id="m3">Sobre</div></div>`:""}`;
+  document.querySelectorAll("[data-g]").forEach(e=>e.onclick=()=>go(e.dataset.g));
+  $("mn").onclick=()=>{menuOpen=!menuOpen;rHome()};
+  if(menuOpen){
+    $("shade").onclick=()=>{menuOpen=false;rHome()};
+    $("m1").onclick=()=>{
+      data=data.filter(e=>!e.d).concat(makeDemo());saveAll();menuOpen=false;rHome();
+      modal("Dados de demonstração","Carreguei registros fictícios dos últimos 7 dias. Eles aparecem marcados nos relatórios.","OK");
+    };
+    $("m2").onclick=()=>{ if(!demoN)return; menuOpen=false; rHome();
+      modal("Remover dados de demonstração?",`Serão apagados somente os ${demoN} registros fictícios. Seus registros reais não serão afetados.`,"REMOVER",
+        ()=>{data=data.filter(e=>!e.d);saveAll();rHome()},"CANCELAR");
+    };
+    $("m3").onclick=()=>{menuOpen=false;rHome();
+      modal("Protótipo","Protótipo de demonstração para a proposta de controle de entrega de privativos. Funciona offline, guarda os dados neste aparelho, não está conectado ao sistema oficial e não faz parte dele.","OK")};
+  }
+}
+
+/* ---------- ENTREGA ---------- */
+function sumLine(){return `${st.sector} • ID ${st.id} • ${order(st.cores).join(" + ")} • ${st.size}`}
+function rEntrega(){
+  const info=st.msg?`<div class="info ok">${esc(st.msg)}</div>`:
+   `<div class="info">${ready()?esc(sumLine()):"Preencha todos os campos"}</div>`;
+  $("scr").innerHTML=bar("ENTREGA DE PRIVATIVOS",true,false)+`
+  <div class="ent">
+    <div class="sec s1">
+      <div class="label">1. SETOR</div>
+      <div class="pad"><div class="grid g3">
+        ${SECTORS.map(x=>`<div class="opt${x===st.sector?" sel":""}${x==="ENG. CLÍNICA"?" span2":""}" data-s="${x}">${x}</div>`).join("")}
+      </div></div>
+    </div>
+    <div class="two">
+      <div><div class="label">2. ID</div><div class="pad"><input class="id" id="idf" inputmode="numeric" pattern="[0-9]*" maxlength="10" autocomplete="off" placeholder="Digite ou leia o crachá" value="${esc(st.id)}"></div></div>
+      <div><div class="label">3. FUNÇÃO</div><div class="pad"><div class="fn${st.fn?"":" ph"}" id="fnb"><span>${SHORT[st.fn]||"Escolher"}</span><span>▾</span></div></div></div>
+    </div>
+    <div class="sec s4">
+      <div class="label">4. COR DO PRIVATIVO <small>(pode marcar mais de uma)</small></div>
+      <div class="pad"><div class="grid g4">
+        ${COLORS.map(c=>`<div class="cor${st.cores.includes(c.n)?" sel":""}" style="background:${c.bg};color:${c.fg}" data-c="${c.n}">${st.cores.includes(c.n)?'<span class="chk">✓</span>':""}${c.n.toUpperCase()}</div>`).join("")}
+      </div></div>
+    </div>
+    <div class="sec s5">
+      <div class="label">5. TAMANHO</div>
+      <div class="pad"><div class="grid g5">
+        ${SIZES.map(x=>`<div class="opt${x===st.size?" sel":""}" data-z="${x}">${x}</div>`).join("")}
+      </div></div>
+    </div>
+    <div class="foot">${info}<div class="btn${ready()?" on":""}" id="go">REGISTRAR ENTREGA</div></div>
+  </div>
+  ${st.sheet?`<div class="sheet-bg" id="sbg"><div class="sheet"><div class="t">FUNÇÃO</div>
+    ${FUNCS.map(f=>`<div class="it${f===st.fn?" sel":""}" data-f="${f}">${f}</div>`).join("")}</div></div>`:""}`;
+  wireBack();
+  const s=$("scr");
+  s.querySelectorAll("[data-s]").forEach(e=>e.onclick=()=>{st.sector=e.dataset.s;rEntrega()});
+  s.querySelectorAll("[data-z]").forEach(e=>e.onclick=()=>{st.size=e.dataset.z;rEntrega()});
+  s.querySelectorAll("[data-c]").forEach(e=>e.onclick=()=>{const c=e.dataset.c;
+    st.cores=st.cores.includes(c)?st.cores.filter(x=>x!==c):st.cores.concat(c);rEntrega()});
+  $("fnb").onclick=()=>{st.sheet=true;rEntrega()};
+  if(st.sheet){
+    $("sbg").onclick=ev=>{if(ev.target.id==="sbg"){st.sheet=false;rEntrega()}};
+    s.querySelectorAll("[data-f]").forEach(e=>e.onclick=ev=>{ev.stopPropagation();st.fn=e.dataset.f;st.sheet=false;
+      st.cores=DEFAULT_COLOR[st.fn]?[DEFAULT_COLOR[st.fn]]:[];rEntrega()});
+  }
+  // o campo de ID não redesenha a tela a cada número digitado (mantém o teclado aberto)
+  const idf=$("idf");
+  idf.oninput=()=>{st.id=idf.value.replace(/\D/g,"");idf.value=st.id;
+    $("go").className="btn"+(ready()?" on":"");
+    if(!st.msg)s.querySelector(".info").textContent=ready()?sumLine():"Preencha todos os campos"};
+  $("go").onclick=()=>{
+    if(!ready())return;
+    const n=Date.now();if(n-last<800)return;last=n; // evita registro duplicado por toque repetido
+    data.push({k:todayKey(),t:n,s:st.sector,z:st.size,i:st.id.trim(),f:st.fn,c:order(st.cores),d:0});
+    saveAll();
+    const m=`✓ ENTREGA REGISTRADA\n${st.sector} • ID ${st.id} • ${order(st.cores).join(" + ")} • ${st.size}`;
+    st={sector:null,id:"",fn:null,cores:[],size:null,sheet:false,msg:m};
+    clearTimeout(timer);timer=setTimeout(()=>{st.msg=null;if(screen==="entrega")rEntrega()},2000);
+    if(document.activeElement)document.activeElement.blur();
+    rEntrega();
+  };
+}
+
+/* ---------- barra de data compartilhada ---------- */
+function dateBar(){
+  const isToday=day>=todayKey();
+  return `<div class="datebar"><div class="arr" id="pv">◀</div>
+  <div class="mid"><div class="d">${labelOf(day)}</div><div class="s">${isToday?"hoje • ":""}toque para escolher a data</div>
+    <input type="date" id="dp" value="${day}" max="${todayKey()}"></div>
+  <div class="arr${isToday?" off":""}" id="nx">▶</div></div>`;
+}
+function wireDate(r){
+  $("pv").onclick=()=>{day=addDays(day,-1);r()};
+  $("nx").onclick=()=>{if(day<todayKey()){day=addDays(day,1);r()}};
+  $("dp").onchange=e=>{const v=e.target.value;if(v&&v<=todayKey()){day=v;r()}};
+}
+const demoNote=a=>{const n=a.filter(e=>e.d).length;return n?`<div class="demo">Inclui ${n} registros FICTÍCIOS de demonstração</div>`:""};
+
+/* ---------- RELATÓRIO setor x tamanho ---------- */
+function rRel(){
+  const a=recs(day);
+  let body;
+  if(!a.length){body='<div class="empty">Nenhum registro de entrega nesta data.</div>'}
+  else{
+    const m={};SECTORS.forEach(s=>{m[s]={};SIZES.forEach(z=>m[s][z]=0)});
+    a.forEach(e=>{if(m[e.s])m[e.s][e.z]+=e.c.length});
+    const sT=s=>SIZES.reduce((x,z)=>x+m[s][z],0),zT=z=>SECTORS.reduce((x,s)=>x+m[s][z],0),P=pieces(a);
+    let L='<div class="cell hd" style="justify-content:flex-start;padding-left:6px">Setor</div>';
+    let M='<div class="inner"><div style="display:flex">'+SIZES.map(z=>`<div class="cell w hd">${z}</div>`).join("")+'</div>';
+    let R='<div class="cell hd">Total</div>';
+    SECTORS.forEach((s,i)=>{const c=i%2?"odd":"even";
+      L+=`<div class="cell ${c}">${s}</div>`;
+      M+=`<div style="display:flex" class="${c}">`+SIZES.map(z=>`<div class="cell w">${m[s][z]}</div>`).join("")+'</div>';
+      R+=`<div class="cell ${c}">${sT(s)}</div>`});
+    L+='<div class="cell tot" style="justify-content:flex-start;padding-left:6px">TOTAL GERAL</div>';
+    M+='<div style="display:flex" class="tot">'+SIZES.map(z=>`<div class="cell w" style="font-weight:700">${zT(z)}</div>`).join("")+'</div></div>';
+    R+=`<div class="cell tot">${P}</div>`;
+    const list=a.filter(e=>!filter||e.s===filter);
+    const shown=list.slice(0,100);
+    body=`<div class="sum"><div><b>${a.length}</b><span>REGISTROS NO DIA</span></div><div><b>${P}</b><span>UNIFORMES ENTREGUES</span></div></div>
+    ${demoNote(a)}
+    <div class="tbl"><div class="cl l">${L}</div><div class="cs">${M}</div><div class="cr r">${R}</div></div>
+    <div class="hint">← deslize para ver os outros tamanhos →</div>
+    <div class="label" style="margin-top:10px">ENTREGAS POR ID</div>
+    <div class="filter">${['<div class="chip'+(filter===null?" on":"")+'" data-f="">TODOS</div>'].concat(SECTORS.map(s=>`<div class="chip${filter===s?" on":""}" data-f="${s}">${s}</div>`)).join("")}</div>
+    ${shown.map(e=>`<div class="item"><span class="h">${hhmm(e.t)}</span><span class="id">${esc(e.i)}</span><span class="sc">${e.s}</span><span class="sz">${e.z}</span></div>`).join("")}
+    ${list.length>shown.length?`<div class="hint">+ ${list.length-shown.length} registros</div>`:""}`;
+  }
+  $("scr").innerHTML=bar("RELATÓRIOS",true,false)+dateBar()+`<div class="body">${body}</div>`;
+  wireBack();wireDate(rRel);
+  document.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{filter=c.dataset.f||null;rRel()});
+}
+
+/* ---------- RELATÓRIO DE CORES ---------- */
+function rCores(){
+  const a=recs(day);
+  let body;
+  if(!a.length){body='<div class="empty">Nenhum registro de entrega nesta data.</div>'}
+  else{
+    const per=f=>a.filter(e=>e.f===f);
+    const cnt=(f,c)=>per(f).filter(e=>e.c.includes(c)).length;
+    let rows=FUNCS.map(f=>`<tr><td>${SHORT[f]}</td><td class="b">${per(f).length}</td>${CN.map(c=>`<td>${cnt(f,c)}</td>`).join("")}</tr>`).join("");
+    rows+=`<tr class="tt"><td>TOTAL</td><td>${a.length}</td>${CN.map(c=>`<td>${a.filter(e=>e.c.includes(c)).length}</td>`).join("")}</tr>`;
+    const combos=FUNCS.map(f=>{
+      const m={};per(f).forEach(e=>{const k=e.c.join(" + ");m[k]=(m[k]||0)+1});
+      const ks=Object.keys(m).sort((x,y)=>m[y]-m[x]);if(!ks.length)return"";
+      return `<div class="combo"><div class="n">${f}: ${per(f).length} ${per(f).length===1?"pessoa":"pessoas"}</div><div class="pills">${
+        ks.map(k=>`<div class="pill">${k.split(" + ").map(dot).join("")}${k}<b>${m[k]}</b></div>`).join("")}</div></div>`}).join("");
+    body=`<div class="sum"><div><b>${a.length}</b><span>PESSOAS ATENDIDAS</span></div><div><b>${pieces(a)}</b><span>PEÇAS ENTREGUES</span></div></div>
+    ${demoNote(a)}
+    <table><tr><th>Função</th><th>Pessoas</th>${COLORS.map(c=>`<th>${dot(c.n)}<br>${c.n}</th>`).join("")}</tr>${rows}</table>
+    <div class="label" style="margin-top:10px">COMBINAÇÕES DE CORES POR FUNÇÃO</div>${combos}`;
+  }
+  $("scr").innerHTML=bar("RELATÓRIO DE CORES",true,false)+dateBar()+`<div class="body">${body}</div>`;
+  wireBack();wireDate(rCores);
+}
+
+function render(){
+  if(screen==="home")rHome();else if(screen==="entrega")rEntrega();
+  else if(screen==="rel")rRel();else rCores();
+}
+
+/* ---------- ajuste à altura real da tela (teclado aberto no celular) ---------- */
+function fit(){
+  const h=(window.visualViewport?window.visualViewport.height:window.innerHeight);
+  document.documentElement.style.setProperty("--vh",h+"px");
+}
+fit();
+if(window.visualViewport)window.visualViewport.addEventListener("resize",fit);
+window.addEventListener("resize",fit);
+
+// botão "voltar" do celular volta para a tela inicial em vez de sair do app
+history.replaceState({s:"home"},"");
+const _go=go;
+go=function(s){if(s!=="home"&&screen==="home")history.pushState({s},"");_go(s)};
+window.addEventListener("popstate",()=>{if(screen!=="home"){screen="home";menuOpen=false;render()}});
+
+render();
+
+// permite abrir sem internet depois da primeira visita (só funciona quando a página está publicada em https)
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+</script>
+</body>
+</html>
