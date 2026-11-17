@@ -14,17 +14,12 @@
   :root{--bar:#3F51B5;--bg:#EAF0FB;--text:#2F45B5;--div:#B4BCCB;--sel:#C3D2F6;--dis:#9AA3B8;--ok:#2E7D32;--olive:#8C7B14}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;height:100%}
-  body{background:#d9dde6;font-family:Roboto,Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px}
-  .desknote{max-width:380px;font-size:12px;color:#444;margin:0 0 10px;text-align:center;line-height:1.4}
-  .phone{width:360px;height:720px;background:#111;border-radius:22px;padding:10px;box-shadow:0 6px 24px rgba(0,0,0,.35)}
-  .screen{position:relative;width:100%;height:100%;background:var(--bg);border-radius:6px;overflow:hidden;display:flex;flex-direction:column}
-  /* no celular: ocupa a tela toda, sem moldura */
-  @media (max-width:600px){
-    body{display:block;padding:0;background:var(--bg)}
-    .desknote{display:none}
-    .phone{width:100%;height:var(--vh,100dvh);padding:0;border-radius:0;background:none;box-shadow:none}
-    .screen{border-radius:0}
-  }
+  body{background:var(--bg);font-family:Roboto,Arial,sans-serif;margin:0;padding:0}
+  .desknote{display:none}
+  /* qualquer aparelho: ocupa a tela toda (altura real); em telas largas fica centralizado */
+  .phone{width:100%;max-width:720px;margin:0 auto;height:var(--vh,100dvh);background:none}
+  .screen{position:relative;width:100%;height:100%;background:var(--bg);overflow:hidden;display:flex;flex-direction:column}
+  @media (min-width:721px){body{background:#d9dde6}.phone{box-shadow:0 0 24px rgba(0,0,0,.25)}}
   .bar{background:var(--bar);color:#fff;min-height:52px;padding-top:env(safe-area-inset-top);display:flex;align-items:center;font-size:17px;font-weight:500;flex:none}
   .bar .back,.bar .menu{width:48px;text-align:center;cursor:pointer;user-select:none;height:52px;line-height:52px}
   .bar .back{font-size:24px}.bar .menu{font-size:26px}
@@ -97,6 +92,8 @@
   .sum div{flex:1;text-align:center}
   .sum b{display:block;font-size:28px;color:var(--bar)}
   .sum span{font-size:10px;color:var(--text)}
+  .syncline{font-size:11px;text-align:center;padding:5px 8px;color:#444;background:#fff;border-bottom:1px solid var(--div)}
+  .syncline.ok{color:var(--ok)}.syncline.off{color:#B26A00}
   .demo{font-size:11px;font-weight:700;color:var(--olive);text-align:center;padding-bottom:6px}
   .empty{padding:60px 24px;text-align:center;font-size:17px;color:var(--text)}
   .tbl{display:flex;width:100%}
@@ -136,6 +133,7 @@
 <p class="desknote"><b>Protótipo de entrega de privativos.</b> Os registros ficam salvos neste navegador. No celular, abra este arquivo e a tela ocupa o aparelho todo.</p>
 <div class="phone"><div class="screen" id="scr"></div></div>
 
+<script src="firebase-config.js"></script>
 <script>
 const SECTORS=["UTI","C.C.","CME","SND","ENG. CLÍNICA"];
 const SIZES=["PP","P","M","G","GG","EXG","EXG2","EXG3","EXG4"];
@@ -160,7 +158,78 @@ function saveAll(){
   try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){storageOk=false}
 }
 let data=loadAll();
-// registro: {k:"aaaa-mm-dd", t:timestamp, s:setor, z:tamanho, i:id, f:função, c:[cores], d:1 se fictício}
+
+/* ---------- sincronização entre aparelhos (Firebase Firestore) ---------- */
+// sem configuração em firebase-config.js o app funciona só neste aparelho.
+// com configuração, as entregas reais vão para o servidor e todos os aparelhos veem os mesmos números.
+// dados de demonstração nunca vão para o servidor.
+const sync={mode:"local"}; // local | connecting | online | offline
+let db=null;
+const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+function pushRemote(e){ if(db&&!e.d&&e.u)db.collection("entregas").doc(e.u).set(e).catch(()=>{}) }
+function loadScript(src){return new Promise((ok,no)=>{const x=document.createElement("script");x.src=src;x.onload=ok;x.onerror=no;document.head.appendChild(x)})}
+const useFb=!!(window.FIREBASE_CONFIG&&window.FIREBASE_CONFIG.projectId);
+let user=null, authBusy=useFb, loginMsg="", loginEmail="", unsub=null;
+function syncRefresh(){
+  if(typeof render!=="function")return;
+  if(useFb&&!user)return;
+  if(screen==="entrega")return; // não mexe na tela enquanto alguém digita
+  if($("scr").querySelector(".modal"))return;
+  render();
+}
+function listen(){
+  // registros reais antigos deste aparelho, que ainda não têm código, sobem uma única vez
+  data.forEach(e=>{if(!e.d&&!e.u){e.u=newId();e.by=user.email;pushRemote(e)}});
+  saveAll();
+  sync.mode="connecting";
+  unsub=db.collection("entregas").onSnapshot(snap=>{
+    const remote=snap.docs.map(d=>d.data());
+    data=data.filter(e=>e.d).concat(remote);
+    saveAll();
+    sync.pending=snap.metadata.hasPendingWrites;
+    sync.mode=snap.metadata.fromCache?"offline":"online";
+    syncRefresh();
+  },()=>{sync.mode="offline";syncRefresh()});
+}
+function startSync(){
+  try{
+    firebase.initializeApp(window.FIREBASE_CONFIG);
+    db=firebase.firestore();
+    try{db.enablePersistence({synchronizeTabs:true}).catch(()=>{})}catch(e){}
+    firebase.auth().onAuthStateChanged(u=>{
+      authBusy=false;
+      if(u){user=u;loginMsg="";if(!unsub)listen()}
+      else{user=null;if(unsub){unsub();unsub=null}}
+      render();
+    });
+  }catch(e){authBusy=false;loginMsg="Não foi possível iniciar o login.";render()}
+}
+if(useFb){
+  sync.mode="connecting";
+  loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js")
+    .then(()=>loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"))
+    .then(()=>loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"))
+    .then(startSync)
+    .catch(()=>{authBusy=false;sync.mode="offline";loginMsg="Sem conexão. Conecte-se à internet para entrar.";render()});
+}
+async function logout(){
+  if(sync.pending){modal("Ainda há registros sem enviar","Há entregas neste aparelho que ainda não subiram para o servidor. Conecte-se à internet, espere ficar \"Sincronizado\" e saia de novo.","OK");return}
+  try{
+    if(unsub){unsub();unsub=null}
+    data=data.filter(e=>e.d);saveAll();
+    await firebase.auth().signOut();
+    try{await db.terminate();await db.clearPersistence()}catch(e){}
+  }catch(e){}
+  location.reload();
+}
+const SYNC_TXT={
+  local:["","Modo local: os registros ficam só neste aparelho"],
+  connecting:["","Conectando ao servidor…"],
+  online:["ok","● Sincronizado: todos os aparelhos veem os mesmos números"],
+  offline:["off","Sem conexão: os registros ficam neste aparelho e sobem sozinhos quando a internet voltar"]
+};
+const syncLine=()=>{const t=SYNC_TXT[sync.mode];return `<div class="syncline ${t[0]}">${t[1]}</div>`};
+// registro: {u:código único, k:"aaaa-mm-dd", t:timestamp, s:setor, z:tamanho, i:id, f:função, c:[cores], d:1 se fictício}
 
 /* ---------- datas ---------- */
 const pad=n=>String(n).padStart(2,"0");
@@ -231,12 +300,13 @@ function rHome(){
   const demoN=data.filter(e=>e.d).length;
   $("scr").innerHTML=bar("PROTÓTIPO",false,true)+`
   ${storageOk?"":'<div class="warn">Este navegador não permite salvar dados. Os registros somem ao fechar a página.</div>'}
+  ${syncLine()}
   <div class="body">
     <div class="mrow b" data-g="entrega">${ICON.shirt}ENTREGA DE PRIVATIVOS</div>
     <div class="mrow" data-g="rel">${ICON.bars}RELATÓRIOS</div>
     <div class="mrow" data-g="cores">${ICON.pal}RELATÓRIO DE CORES</div>
   </div>
-  ${menuOpen?`<div class="shade" id="shade"></div><div class="menupanel"><div id="m1">Carregar dados de demonstração</div><div id="m2" class="${demoN?"":"off"}">Remover dados de demonstração (${demoN})</div><div id="m3">Sobre</div></div>`:""}`;
+  ${menuOpen?`<div class="shade" id="shade"></div><div class="menupanel"><div id="m1">Carregar dados de demonstração</div><div id="m2" class="${demoN?"":"off"}">Remover dados de demonstração (${demoN})</div><div id="m3">Sobre</div>${useFb&&user?`<div id="m4">Sair (${esc(userName(user))})</div>`:""}</div>`:""}`;
   document.querySelectorAll("[data-g]").forEach(e=>e.onclick=()=>go(e.dataset.g));
   $("mn").onclick=()=>{menuOpen=!menuOpen;rHome()};
   if(menuOpen){
@@ -249,8 +319,9 @@ function rHome(){
       modal("Remover dados de demonstração?",`Serão apagados somente os ${demoN} registros fictícios. Seus registros reais não serão afetados.`,"REMOVER",
         ()=>{data=data.filter(e=>!e.d);saveAll();rHome()},"CANCELAR");
     };
+    if($("m4"))$("m4").onclick=()=>{menuOpen=false;logout()};
     $("m3").onclick=()=>{menuOpen=false;rHome();
-      modal("Protótipo","Protótipo de demonstração para a proposta de controle de entrega de privativos. Funciona offline, guarda os dados neste aparelho, não está conectado ao sistema oficial e não faz parte dele.","OK")};
+      modal("Protótipo","Protótipo de demonstração para a proposta de controle de entrega de privativos. Funciona offline, guarda os dados neste aparelho (e, se o servidor estiver configurado, sincroniza entre aparelhos), não está conectado ao sistema oficial e não faz parte dele.","OK")};
   }
 }
 
@@ -307,8 +378,9 @@ function rEntrega(){
   $("go").onclick=()=>{
     if(!ready())return;
     const n=Date.now();if(n-last<800)return;last=n; // evita registro duplicado por toque repetido
-    data.push({k:todayKey(),t:n,s:st.sector,z:st.size,i:st.id.trim(),f:st.fn,c:order(st.cores),d:0});
-    saveAll();
+    const rec={u:newId(),by:user?user.email:"",k:todayKey(),t:n,s:st.sector,z:st.size,i:st.id.trim(),f:st.fn,c:order(st.cores),d:0};
+    data.push(rec);
+    saveAll();pushRemote(rec);
     const m=`✓ ENTREGA REGISTRADA\n${st.sector} • ID ${st.id} • ${order(st.cores).join(" + ")} • ${st.size}`;
     st={sector:null,id:"",fn:null,cores:[],size:null,sheet:false,msg:m};
     clearTimeout(timer);timer=setTimeout(()=>{st.msg=null;if(screen==="entrega")rEntrega()},2000);
@@ -362,7 +434,7 @@ function rRel(){
     ${shown.map(e=>`<div class="item"><span class="h">${hhmm(e.t)}</span><span class="id">${esc(e.i)}</span><span class="sc">${e.s}</span><span class="sz">${e.z}</span></div>`).join("")}
     ${list.length>shown.length?`<div class="hint">+ ${list.length-shown.length} registros</div>`:""}`;
   }
-  $("scr").innerHTML=bar("RELATÓRIOS",true,false)+dateBar()+`<div class="body">${body}</div>`;
+  $("scr").innerHTML=bar("RELATÓRIOS",true,false)+dateBar()+syncLine()+`<div class="body">${body}</div>`;
   wireBack();wireDate(rRel);
   document.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{filter=c.dataset.f||null;rRel()});
 }
@@ -387,11 +459,40 @@ function rCores(){
     <table><tr><th>Função</th><th>Pessoas</th>${COLORS.map(c=>`<th>${dot(c.n)}<br>${c.n}</th>`).join("")}</tr>${rows}</table>
     <div class="label" style="margin-top:10px">COMBINAÇÕES DE CORES POR FUNÇÃO</div>${combos}`;
   }
-  $("scr").innerHTML=bar("RELATÓRIO DE CORES",true,false)+dateBar()+`<div class="body">${body}</div>`;
+  $("scr").innerHTML=bar("RELATÓRIO DE CORES",true,false)+dateBar()+syncLine()+`<div class="body">${body}</div>`;
   wireBack();wireDate(rCores);
 }
 
+function rLogin(){
+  const esc2=x=>String(x).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const form=authBusy?'<div class="info">Carregando…</div>':
+   (loginMsg&&!window.firebase?'':`<input id="lem" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" placeholder="Login" value="${esc2(loginEmail)}" style="${LI}">
+    <input id="lpw" type="password" autocomplete="current-password" placeholder="Senha" style="${LI}">
+    <div class="btn on" id="lgo" style="margin:14px 0 0">ENTRAR</div>`);
+  $("scr").innerHTML=bar("PROTÓTIPO",false,false)+`<div class="body" style="padding:22px 18px">
+    <div style="text-align:center;font-weight:700;color:var(--text);font-size:16px;margin-bottom:14px">ENTRAR</div>
+    ${form}
+    <div class="info" style="color:#B3261E;margin-top:8px">${esc2(loginMsg)}</div></div>`;
+  if(authBusy||!window.firebase)return;
+  const doLogin=()=>{
+    loginEmail=$("lem").value.trim();const pw=$("lpw").value;
+    if(!loginEmail||!pw){loginMsg="Digite o login e a senha.";rLogin();return}
+    loginMsg="";$("lgo").textContent="ENTRANDO…";
+    firebase.auth().signInWithEmailAndPassword(loginEmail.includes("@")?loginEmail:loginEmail.toLowerCase()+LOGIN_DOMAIN,pw).catch(err=>{
+      const c=err&&err.code||"";
+      loginMsg=/network/.test(c)?"Sem conexão com a internet.":/too-many/.test(c)?"Muitas tentativas. Espere alguns minutos.":"Login ou senha incorretos.";
+      rLogin();
+    });
+  };
+  $("lgo").onclick=doLogin;
+  $("lpw").onkeydown=e=>{if(e.key==="Enter")doLogin()};
+}
+const LOGIN_DOMAIN="@privativos.app"; // o login simples vira um e-mail interno só para o Firebase
+const userName=u=>String((u&&u.email)||"").replace(LOGIN_DOMAIN,"");
+const LI="display:block;width:100%;height:50px;margin:0 0 10px;padding:0 12px;border:1px solid var(--div);background:#fff;font-size:16px;color:#222;border-radius:0;outline:none";
+
 function render(){
+  if(useFb&&!user){rLogin();return}
   if(screen==="home")rHome();else if(screen==="entrega")rEntrega();
   else if(screen==="rel")rRel();else rCores();
 }
